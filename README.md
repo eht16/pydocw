@@ -7,6 +7,8 @@ for Python keywords, classes and methods in a simple text window.
 
 Should work with Python 2 and 3.
 
+Best used with [Geany](https://www.geany.org) and its context actions: https://wiki.geany.org/howtos/pydocw
+
 ## Usage
 
     # show help about the pydoc help system
