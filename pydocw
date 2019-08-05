@@ -1,0 +1,131 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# This software may be modified and distributed under the terms
+# of the MIT license.  See the LICENSE file for details.
+#
+#
+# Simple TK based frontend for "pydoc" to show the help text
+# for Python keywords, classes and methods in a simple text window.
+#
+# Should work with Python 2 and 3.
+#
+
+from __future__ import print_function
+
+import pydoc
+import sys
+
+
+PY3 = sys.version_info[0] == 3
+
+if PY3:
+    from io import StringIO
+    from tkinter.scrolledtext import ScrolledText
+    import tkinter as tk
+else:
+    from ScrolledText import ScrolledText
+    from StringIO import StringIO
+    import Tkinter as tk
+
+
+class Application(tk.Frame):
+
+    # ----------------------------------------------------------------------
+    def __init__(self, master, title, help_text):
+        if PY3:
+            super(Application, self).__init__(master)
+        else:
+            tk.Frame.__init__(self, master)
+        self.master = master
+        self.pack()
+
+        self.master.title(title)
+
+        # scrollable text widget
+        self._text_widget = ScrolledText(self)
+        self._text_widget.insert(tk.END, help_text)
+        self._text_widget.bind('<Key>', self._exit)
+        self._text_widget.bind('<Button-1>', self._hide_popup)
+        self._text_widget.bind('<Button-3>', self._show_popup)
+
+        # context menu
+        menubar = tk.Menu(self.master)
+        self._menu_edit = tk.Menu(menubar, tearoff=0)
+        self._menu_edit.add_command(label='Copy', command=self._copy)
+        self._menu_edit.add_command(label='Select All', command=self._select_all)
+        self._menu_edit.add_separator()
+        self._menu_edit.add_command(label='Close', command=self._exit)
+
+        self._text_widget.pack()
+        self._text_widget.focus()
+
+    # ----------------------------------------------------------------------
+    def _show_popup(self, event):
+        self._menu_edit.post(event.x_root, event.y_root)
+
+    # ----------------------------------------------------------------------
+    def _hide_popup(self, event):
+        self._menu_edit.unpost()
+
+    # ----------------------------------------------------------------------
+    def _copy(self):
+        self._text_widget.event_generate('<<Copy>>')
+        return 'break'
+
+    # ----------------------------------------------------------------------
+    def _select_all(self):
+        self._text_widget.selection_clear()
+        self._text_widget.tag_add(tk.SEL, '1.0', tk.END)
+        return 'break'
+
+    # ----------------------------------------------------------------------
+    def _exit(self, event=None):
+        self.master.destroy()
+        return 'break'
+
+
+class StringIOPager(StringIO):
+
+    # ----------------------------------------------------------------------
+    def __call__(self, text):
+        excaped_text = pydoc.plain(text)
+        self.write(excaped_text)
+
+
+# ----------------------------------------------------------------------
+def _get_help_text(word):
+    # patch pydoc to *not* use a pager, see bpo-37755
+    help_text_pager = StringIOPager()
+    pydoc.pager = help_text_pager
+
+    helper = pydoc.Helper(output=help_text_pager)
+    helper.help(word)
+
+    help_text_pager.seek(0)
+    return help_text_pager.read()
+
+
+# ----------------------------------------------------------------------
+def main():
+    try:
+        word = sys.argv[1]
+    except IndexError:
+        print('usage: pydocw <name>', file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        help_text = _get_help_text(word)
+    except Exception as exc:
+        help_text = 'An error occurred:\n{}'.format(exc)
+
+    title = 'PyDoc Instant Helper'
+    help_text = '{}\n\n---------------------\nPress any key to quit'.format(help_text)
+
+    root = tk.Tk()
+    app = Application(root, title, help_text)
+    app.mainloop()
+
+
+if __name__ == '__main__':
+    main()
